@@ -19,10 +19,21 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 // Collect function, called on by Prometheus Client library
 // This function is called when a scrape is performed on the /metrics page
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
-	now := time.Now()
-	sevenPM := time.Date(now.Year(), now.Month(), now.Day(), 1, 0, 0, 0, now.Location())
-	sevenAM := sevenPM.Add(time.Hour * 12)
-	if now.After(sevenPM) && now.Before(sevenAM) {
+	// Load the configured timezone
+	loc, err := time.LoadLocation(e.Config.Timezone)
+	if err != nil {
+		log.Errorf("Error loading timezone %s: %v", e.Config.Timezone, err)
+		// Fall back to local timezone
+		loc = time.Local
+	}
+
+	now := time.Now().In(loc)
+	// Set active hours from 6am to 8pm
+	sixAM := time.Date(now.Year(), now.Month(), now.Day(), 6, 0, 0, 0, loc)
+	eightPM := time.Date(now.Year(), now.Month(), now.Day(), 20, 0, 0, 0, loc)
+
+	// Check if current time is outside active hours (before 6am or after 8pm)
+	if now.Before(sixAM) || now.After(eightPM) {
 		siteOverview := solaredge.SiteOverview{}
 		siteOverview.CurrentPower.Power = 0.0
 		err := e.processMetrics(siteOverview, ch)
@@ -30,7 +41,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 			log.Error("Error Processing Metrics", err)
 			return
 		}
-		log.Info("Bailing out of metrics collection due to night time")
+		log.Info("Bailing out of metrics collection due to inactive hours (outside 6am-8pm)")
 		return
 	}
 	// Scrape the Data from Solaredge

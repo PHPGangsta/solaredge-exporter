@@ -12,6 +12,7 @@ type Config struct {
 	*cfg.BaseConfig
 	Site          int64
 	APIToken      string
+	Timezone      string
 }
 
 func Init() Config {
@@ -22,11 +23,17 @@ func Init() Config {
 	}
 	APIToken := os.Getenv("API_TOKEN")
 
+	// Set default timezone to CST (America/Chicago) for backward compatibility
+	timezone := os.Getenv("TIMEZONE")
+	if timezone == "" {
+		timezone = "America/Chicago"
+	}
 
 	appConfig := Config{
 		&ac,
 		siteID,
 		APIToken,
+		timezone,
 	}
 
 	return appConfig
